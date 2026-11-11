@@ -80,13 +80,16 @@ export async function uiCommand(
   if (!installed) print(t('ui.download', { pkg }))
   const npx = npxCommand()
   const npxArgs = [...npx.pre, '--yes', pkg, ...args]
+  // The app watches this process: if it is killed hard, no signal reaches the app (npx may sit between).
+  const env = { ...process.env, ACCORD_UI_PARENT_PID: String(process.pid) }
   const child = installed
-    ? spawn(process.execPath, [installed, ...args], { stdio: 'inherit' })
+    ? spawn(process.execPath, [installed, ...args], { stdio: 'inherit', env })
     : // From a neutral folder: a repository's own .npmrc must not redirect where @decivo packages come from.
       spawn(npx.cmd, npx.shell ? npxArgs.map(quoteForCmd) : npxArgs, {
         stdio: 'inherit',
         shell: npx.shell,
         cwd: tmpdir(),
+        env,
       })
   // Ctrl+C in a terminal reaches both processes; a signal sent to this process alone (kill, a closed
   // terminal, a process manager) is passed on, so the app never outlives the command.
