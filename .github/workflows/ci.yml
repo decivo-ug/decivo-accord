@@ -37,4 +37,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm turbo run test --continue
+      - run: pnpm test
+      # The web app really starts here: one-time address, session, and it stops with its launcher.
+      - run: node scripts/ui-smoke.mjs
