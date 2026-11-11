@@ -290,9 +290,11 @@ export function stylesheetError(css: string, file: string): string | undefined {
 }
 
 /** Fallback for files Babel cannot parse: unambiguous colours anywhere in the text. */
-function scanText(code: string, file: string): HardValue[] {
+function scanText(code: string, file: string, css = false): HardValue[] {
   const out: HardValue[] = []
   code.split('\n').forEach((text, i) => {
+    // In a stylesheet, a custom property definition is where a token's value lives, not a hard-coded use.
+    if (css && /^\s*--[\w-]+\s*:/.test(text)) return
     for (const m of text.matchAll(EMBEDDED_COLOR)) {
       const color = cssToColor(m[0])
       if (color)
@@ -318,7 +320,7 @@ export function scanStylesheet(css: string, file: string): HardValue[] {
   } catch {
     // A stylesheet with a syntax error (an unclosed block): the unambiguous colours in it still count.
     // `stylesheetError` names the problem for the report.
-    return scanText(css, file)
+    return scanText(css, file, true)
   }
   const out: HardValue[] = []
   const ignored = new Set<number>()

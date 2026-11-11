@@ -193,6 +193,7 @@ export function createAccordServer(options: AccordServerOptions): McpServer {
         files: result.files,
         findings: result.findings,
         ownership: result.ownership,
+        ...(result.unparsable ? { unparsable: result.unparsable } : {}),
       })
     },
   )

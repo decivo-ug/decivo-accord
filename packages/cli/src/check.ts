@@ -1,11 +1,17 @@
+import { execFile } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
+import { promisify } from 'node:util'
 import {
+  type CssVariable,
   codeModeSelectors,
   codeSnapshot,
   cssVariableName,
   type HardValueFinding,
+  parseCssVariables,
   prepareCodeScan,
   scanPaths,
+  stylesheetError,
   withCodeContexts,
 } from '@decivo/accord-adapter-code'
 import {
@@ -56,6 +62,93 @@ export function addedLines(diff: string): Map<string, Set<number>> {
   return files
 }
 
+/** Custom properties whose declaration a unified diff removes, per file (`-  --brand: …`). */
+export function removedVariables(diff: string): Map<string, Set<string>> {
+  const files = new Map<string, Set<string>>()
+  let current: Set<string> | undefined
+  for (const raw of diff.split('\n')) {
+    if (raw.startsWith('+++ ')) {
+      const path = raw.slice(4).trim().replace(/^b\//, '')
+      current = path === '/dev/null' ? undefined : (files.get(path) ?? new Set())
+      if (current) files.set(path, current)
+      continue
+    }
+    if (!current || raw.startsWith('---') || !raw.startsWith('-')) continue
+    for (const m of raw.slice(1).matchAll(/(?:^|[\s;{])(--[\w-]+)\s*:/g)) current.add(m[1] as string)
+  }
+  return files
+}
+
+const exec = promisify(execFile)
+
+/** A file as the last commit has it; undefined when there is no git, no commit, or the file is new. */
+async function committed(root: string, file: string): Promise<string | undefined> {
+  try {
+    return (await exec('git', ['show', `HEAD:./${file}`], { cwd: root, maxBuffer: 32 * 1024 * 1024 })).stdout
+  } catch {
+    return undefined
+  }
+}
+
+const variableKey = (v: CssVariable) => `${v.name}|${v.scope}|${v.list ?? ''}`
+
+/**
+ * The custom properties this change touched in the checked stylesheets: declared on a line the diff adds,
+ * removed by the diff, or, without a diff, different from the last commit. `check` judges the change, not
+ * the state: a value that already differed from the register before (the register moved on, code has not
+ * caught up) is drift for `accord diff`, not something this commit did.
+ */
+async function touchedVariables(input: {
+  root: string
+  files: string[]
+  variables: readonly CssVariable[]
+  added: Map<string, Set<number>> | undefined
+  diff: string | undefined
+}): Promise<{ changed: Set<string>; removed: Set<string> }> {
+  const changed = new Set<string>()
+  const removed = new Set<string>()
+  const now = (file: string) => input.variables.filter((v) => v.file === file)
+  if (input.added && input.diff !== undefined) {
+    const gone = removedVariables(input.diff)
+    for (const file of input.files) {
+      const lines = input.added.get(file)
+      const present = new Set(now(file).map((v) => v.name))
+      for (const v of now(file)) if (lines?.has(v.line)) changed.add(v.name)
+      for (const name of gone.get(file) ?? []) (present.has(name) ? changed : removed).add(name)
+    }
+  } else {
+    for (const file of input.files) {
+      // A file the last commit does not have (new, or no git at all) is new as a whole: every declaration
+      // in it is part of the change.
+      const before = await committed(input.root, file)
+      let base: CssVariable[] = []
+      try {
+        if (before !== undefined) base = parseCssVariables(before, file)
+      } catch {
+        continue // the committed version does not parse: nothing to compare with
+      }
+      const was = new Map(base.map((v) => [variableKey(v), v.value]))
+      const is = new Map(now(file).map((v) => [variableKey(v), v.value]))
+      for (const v of now(file)) if (was.get(variableKey(v)) !== v.value) changed.add(v.name)
+      const present = new Set(now(file).map((v) => v.name))
+      for (const v of base) if (!is.has(variableKey(v))) (present.has(v.name) ? changed : removed).add(v.name)
+    }
+  }
+  // A variable that points at a touched one (`--brand: var(--blue-600)`) changes with it.
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const v of input.variables)
+      if (
+        !changed.has(v.name) &&
+        [...v.value.matchAll(/var\(\s*(--[\w-]+)/g)].some((m) => changed.has(m[1] as string))
+      ) {
+        changed.add(v.name)
+        grew = true
+      }
+  }
+  return { changed, removed }
+}
+
 export interface CheckInput {
   /** Repository root. */
   root: string
@@ -91,6 +184,12 @@ export interface CheckWarning {
   context: string
 }
 
+/** A checked stylesheet Accord could not parse: its token values were not judged. */
+export interface UnparsableFile {
+  file: string
+  detail: string
+}
+
 /**
  * A token change made in code that code does not own (a design value, a register name), or the removal
  * of a token's CSS variable. Code proposes these; the owner decides. Not a rule violation, but not
@@ -117,6 +216,8 @@ export interface CheckResult {
   files: string[]
   /** Hints, never a reason to fail. */
   warnings?: CheckWarning[] | undefined
+  /** Checked stylesheets with a syntax error; their token values could not be judged. */
+  unparsable?: UnparsableFile[] | undefined
 }
 
 const toLiteral = (h: HardValueFinding): LiteralUse => ({
@@ -183,15 +284,41 @@ export async function checkChange(input: CheckInput): Promise<CheckResult> {
       register.modes?.modifier ?? THEME_MODIFIER,
     ),
   }
-  const items = touchesTokens
+  // A stylesheet with a syntax error cannot be judged: its variables are unread, which would look like
+  // every linked token was deleted. It is named instead.
+  const unparsable: UnparsableFile[] = []
+  for (const file of files.filter((f) => f.endsWith('.css'))) {
+    const content = await readFile(join(root, file), 'utf8').catch(() => undefined)
+    const detail = content === undefined ? undefined : stylesheetError(content, file)
+    if (detail) unparsable.push({ file, detail })
+  }
+  const sheets = files.filter(
+    (f) =>
+      (register.config.surfaces.code.css.includes(f) || ctx.stylesheets.includes(f)) &&
+      !unparsable.some((u) => u.file === f),
+  )
+  const touched =
+    touchesTokens && unparsable.length === 0
+      ? await touchedVariables({ root, files: sheets, variables: ctx.variables, added, diff: input.diff })
+      : undefined
+  const variableOf = (path: string) => {
+    const token = register.tokens.get(path.replace(/^tokens\./, ''))
+    return token ? (token.accord?.ids?.css ?? cssVariableName(token)) : undefined
+  }
+  const items = touched
     ? threeWayDiff({
         register: restrictTo(snapshotFromRegister(register), code.snapshot.coverage),
         surface: code.snapshot,
-      }).filter(
+      }).filter((i) => {
+        const name = variableOf(i.op.path)
+        if (name === undefined) return false
         // A token without a variable in code is no removal: most tokens are never written as CSS. Only a
-        // linked variable that is gone (`ids.css`) means code deleted it.
-        (i) => i.op.kind !== 'token.removed' || linkedVariable(register, i.op.path) !== undefined,
-      )
+        // linked variable this change took away (`ids.css`) means code deleted it.
+        if (i.op.kind === 'token.removed')
+          return linkedVariable(register, i.op.path) !== undefined && touched.removed.has(name)
+        // Only what this change touched: drift that was there before is not this commit's doing.
+        return touched.changed.has(name)
+      })
     : []
 
   const evaluation = await evaluate({
@@ -287,11 +414,18 @@ export async function checkChange(input: CheckInput): Promise<CheckResult> {
     findings,
     files,
     ...(warnings.length > 0 ? { warnings } : {}),
+    ...(unparsable.length > 0 ? { unparsable } : {}),
   }
 }
 
-/** One line per F15 hint, for terminals and agents. */
-const warningLines = (result: CheckResult) =>
+/** One line per F15 hint and per stylesheet Accord could not read, for terminals and agents. */
+const warningLines = (result: CheckResult) => [
+  ...(result.unparsable ?? []).map(
+    (u) => `  Note: ${u.file} has a syntax error (${u.detail}); its token values were not checked.`,
+  ),
+  ...warningList(result),
+]
+const warningList = (result: CheckResult) =>
   (result.warnings ?? []).map(
     (w) =>
       `  Note: ${w.token} has no ${w.context} value of its own and shows its default value in ${w.context}.`,
