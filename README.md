@@ -173,8 +173,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
-      - uses: pnpm/action-setup@v6
-      - uses: decivo-ug/decivo-accord/packages/action@main
+      - uses: decivo-ug/decivo-accord/packages/action@v0
 ```
 
 The Action fails on `must` violations in the lines a pull request adds, annotates the line with the fix, and writes a summary. `accord export --check` fails when generated files are out of date. More in [`packages/action`](packages/action/README.md) and [`templates/`](templates/).
@@ -229,6 +228,6 @@ Light and dark work: the register keeps them with the DTCG resolver module (`res
 
 ## Contributing
 
-Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately as described in [SECURITY.md](SECURITY.md).
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). What changed in each release is in [CHANGELOG.md](CHANGELOG.md). Please report security issues privately as described in [SECURITY.md](SECURITY.md).
 
 A product by [decivo](https://decivo.de): Clarity before Code. MIT licensed.

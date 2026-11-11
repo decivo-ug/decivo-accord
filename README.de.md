@@ -140,6 +140,6 @@ Accord ist jung. Getestet ist es gegen echte Design-Systeme aus öffentlichen Re
 
 Hell und Dunkel funktionieren: Das Register hält sie mit dem DTCG-Resolver-Modul (`resolver.json`, `modes/theme/dark.tokens.json`). `init` übernimmt sie aus dem Code (`.dark`, `[data-theme]`, per `@import` eingebundene Themes), aus Figma-Modes und Pencil-Themes; `diff`, `status`, `propose`, `apply`, `design`, die Prüfungen (Kontrast in Hell und Dunkel) und die erzeugten Dateien arbeiten je Kontext.
 
-Mitmachen: [CONTRIBUTING.md](CONTRIBUTING.md). Sicherheitslücken bitte vertraulich melden: [SECURITY.md](SECURITY.md).
+Mitmachen: [CONTRIBUTING.md](CONTRIBUTING.md). Was sich je Release geändert hat, steht in [CHANGELOG.md](CHANGELOG.md). Sicherheitslücken bitte vertraulich melden: [SECURITY.md](SECURITY.md).
 
 Ein Produkt von [decivo](https://decivo.de) – Clarity before Code.

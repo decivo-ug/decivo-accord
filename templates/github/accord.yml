@@ -11,10 +11,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 9
-      - uses: decivo-ug/decivo-accord/packages/action@main
+      - uses: decivo-ug/decivo-accord/packages/action@v0
         # optional: den Bericht nach jedem Lauf per POST an eine eigene https-Adresse senden (accord.report/1,
         # nie Quellcode-Zeilen, siehe docs/report-format.md). Ohne Adresse wird nichts gesendet.
         # with:

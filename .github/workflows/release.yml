@@ -4,6 +4,7 @@ name: Release
 # - Push a tag vX.Y.Z (after `node scripts/set-version.mjs X.Y.Z` is merged): checks, then publishes.
 # - Run it by hand (workflow_dispatch): the same checks and a dry run of the publish, nothing is published.
 # Needs the secret NPM_TOKEN (an automation token for the @decivo scope).
+# After a publish, the major tag (v0) moves to the release, so workflows can use the Action as `…/packages/action@v0`.
 
 on:
   push:
@@ -11,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # moves the major tag (v0) after a publish
   id-token: write # npm provenance
 
 concurrency:
@@ -43,3 +44,9 @@ jobs:
         run: pnpm -r publish --access public --no-git-checks ${{ github.event_name != 'push' && '--dry-run' || '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Move the major tag
+        if: github.event_name == 'push'
+        run: |
+          major="${GITHUB_REF_NAME%%.*}"
+          git tag -f "$major" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$major"

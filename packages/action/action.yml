@@ -12,8 +12,8 @@ inputs:
     description: Verzeichnis mit dem Register (relativ zur Repository-Wurzel)
     default: .
   version:
-    description: '"source" baut Accord aus diesem Action-Repo (Standard, solange nicht auf npm); sonst eine Version von @decivo/accord-cli'
-    default: source
+    description: 'Version von @decivo/accord-cli auf npm. Leer (Standard): die Version, zu der diese Action gehört. "source" baut Accord aus dem Action-Repo (braucht pnpm).'
+    default: ''
   node-version:
     description: Node.js-Version
     default: '22'
@@ -41,6 +41,10 @@ runs:
           (cd "$repo" && pnpm install --frozen-lockfile --filter "@decivo/accord-cli..." && pnpm turbo run build --filter "@decivo/accord-cli...")
           echo "ACCORD_BIN=node $repo/packages/cli/dist/bin.js" >> "$GITHUB_ENV"
         else
+          # Without a version: the release this Action was taken from (@v0, @v0.2.3), so Action and CLI match.
+          if [ -z "$ACCORD_VERSION" ]; then
+            ACCORD_VERSION="$(node -p "require(require('node:path').join(process.env.ACTION_PATH, '..', 'cli', 'package.json')).version")"
+          fi
           echo "ACCORD_BIN=npx --yes @decivo/accord-cli@$ACCORD_VERSION" >> "$GITHUB_ENV"
         fi
     - name: Diff des Pull Requests
