@@ -40,7 +40,7 @@ export type TokenEdit =
   /** Delete a token. Always a person's decision; refused while other tokens point to it. */
   | { kind: 'remove'; path: string }
   /** Point an alias at another token of the same type (`{color.brand}` → `{blue.700}`). */
-  | { kind: 'retarget'; path: string; to: string }
+  | { kind: 'retarget'; path: string; to: string; context?: string | undefined }
 
 export interface EditResult {
   /** Register files whose content changed, with the new content. */
@@ -180,7 +180,10 @@ export function applyTokenEdits(
 
   for (const edit of edits) {
     const context =
-      edit.kind === 'unset' || (edit.kind === 'set' && edit.context !== undefined) ? edit.context : undefined
+      edit.kind === 'unset' ||
+      ((edit.kind === 'set' || edit.kind === 'retarget') && edit.context !== undefined)
+        ? edit.context
+        : undefined
     if (context !== undefined && context !== modes?.default) {
       if (!modes?.contexts.includes(context))
         throw new EditError(`the register has no context ${context}`, edit.path)
@@ -196,6 +199,22 @@ export function applyTokenEdits(
       if (edit.kind === 'unset') {
         if (!own) throw new EditError(`${edit.path} has no ${context} value of its own`, edit.path)
         texts.set(own, removeAt(text(own, edit.path), segs))
+        continue
+      }
+      if (edit.kind === 'retarget') {
+        // The context's own value points at another token there (`{gray.50}` → `{gray.100}`), never a literal.
+        const target = register.tokens.get(edit.to)
+        if (!target || target.type !== token.type)
+          throw new EditError(`${edit.to} is no ${token.type} token to point ${edit.path} at`, edit.path)
+        const file = own ?? fileOfContext(context, edit.path)
+        const current = text(file, edit.path)
+        texts.set(
+          file,
+          applyEdits(
+            current,
+            modify(current, [...segs, '$value'], `{${edit.to}}`, { formattingOptions: formatting(current) }),
+          ),
+        )
         continue
       }
       if (edit.kind !== 'set') continue
