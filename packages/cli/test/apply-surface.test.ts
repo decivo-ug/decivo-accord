@@ -188,7 +188,7 @@ describe('apply on Figma proposals', () => {
   it('with --branch it works for a project in a subfolder of the repository', async () => {
     const top = await mkdtemp(join(tmpdir(), 'accord-mono-'))
     const sub = join(top, 'apps', 'web shop')
-    await cp(root, sub, { recursive: true, filter: (src) => !src.includes(`${root}/.git`) })
+    await cp(root, sub, { recursive: true, filter: (src) => !src.startsWith(join(root, '.git')) })
     const g = (...args: string[]) =>
       execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...args], { cwd: top })
     g('init', '-q', '-b', 'main')
