@@ -192,6 +192,9 @@ describe('apply on Figma proposals', () => {
     const g = (...args: string[]) =>
       execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...args], { cwd: top })
     g('init', '-q', '-b', 'main')
+    // apply --branch commits with the repository's own identity; CI machines have no global one.
+    g('config', 'user.name', 'T')
+    g('config', 'user.email', 't@example.com')
     g('add', '-A')
     g('commit', '-q', '-m', 'mono')
     root = sub
