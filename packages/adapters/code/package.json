@@ -1,6 +1,6 @@
 {
   "name": "@decivo/accord-adapter-code",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Code surface for decivo Accord: reads CSS custom properties, Tailwind v4 themes and hard-coded values.",
   "license": "MIT",
   "repository": {

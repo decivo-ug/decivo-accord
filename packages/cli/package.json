@@ -1,6 +1,6 @@
 {
   "name": "@decivo/accord-cli",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "accord: the command line for decivo Accord, the register for design decisions that people and agents check against.",
   "license": "MIT",
   "repository": {

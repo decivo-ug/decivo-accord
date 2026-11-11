@@ -1,6 +1,6 @@
 {
   "name": "@decivo/accord-core",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Register schema, DTCG 2025.10, ownership model and three-way diff for decivo Accord.",
   "license": "MIT",
   "repository": {
