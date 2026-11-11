@@ -97,7 +97,6 @@ const variableKey = (v: CssVariable) => `${v.name}|${v.scope}|${v.list ?? ''}`
  * removed by the diff, or, without a diff, different from the last commit. `check` judges the change, not
  * the state: a value that already differed from the register before (the register moved on, code has not
  * caught up) is drift for `accord diff`, not something this commit did.
- * Undefined when nothing tells what changed (no diff, and no commit to compare with).
  */
 async function touchedVariables(input: {
   root: string
@@ -105,7 +104,7 @@ async function touchedVariables(input: {
   variables: readonly CssVariable[]
   added: Map<string, Set<number>> | undefined
   diff: string | undefined
-}): Promise<{ changed: Set<string>; removed: Set<string> } | undefined> {
+}): Promise<{ changed: Set<string>; removed: Set<string> }> {
   const changed = new Set<string>()
   const removed = new Set<string>()
   const now = (file: string) => input.variables.filter((v) => v.file === file)
@@ -118,16 +117,15 @@ async function touchedVariables(input: {
       for (const name of gone.get(file) ?? []) (present.has(name) ? changed : removed).add(name)
     }
   } else {
-    let known = false
     for (const file of input.files) {
+      // A file the last commit does not have (new, or no git at all) is new as a whole: every declaration
+      // in it is part of the change.
       const before = await committed(input.root, file)
-      if (before === undefined) continue
-      known = true
-      let base: CssVariable[]
+      let base: CssVariable[] = []
       try {
-        base = parseCssVariables(before, file)
+        if (before !== undefined) base = parseCssVariables(before, file)
       } catch {
-        continue
+        continue // the committed version does not parse: nothing to compare with
       }
       const was = new Map(base.map((v) => [variableKey(v), v.value]))
       const is = new Map(now(file).map((v) => [variableKey(v), v.value]))
@@ -135,7 +133,6 @@ async function touchedVariables(input: {
       const present = new Set(now(file).map((v) => v.name))
       for (const v of base) if (!is.has(variableKey(v))) (present.has(v.name) ? changed : removed).add(v.name)
     }
-    if (!known) return undefined
   }
   // A variable that points at a touched one (`--brand: var(--blue-600)`) changes with it.
   for (let grew = true; grew; ) {
