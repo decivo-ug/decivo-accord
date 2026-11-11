@@ -390,6 +390,7 @@ export async function checkCommand(
           files: result.files,
           findings: result.findings,
           ownership: result.ownership,
+          ...(result.unparsable ? { unparsable: result.unparsable } : {}),
           route: result.evaluation.route,
         },
         null,
