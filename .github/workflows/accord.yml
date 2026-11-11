@@ -12,3 +12,4 @@ jobs:
       - uses: ./packages/action
         with:
           root: apps/web
+          version: source
