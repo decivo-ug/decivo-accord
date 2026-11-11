@@ -144,9 +144,21 @@ function toEdits(
     .filter((i) => i.kind === 'remove' && (i.context === undefined || i.context === register.modes?.default))
     .map((i) => register.tokens.get(i.token))
     .filter((t): t is NonNullable<typeof t> => t !== undefined && t.value !== undefined)
+  const typeOf = (item: Resolution['items'][number]): TokenType =>
+    item.kind === 'change' ? (register.tokens.get(item.token)?.type ?? 'color') : (item.type ?? 'color')
+  const cssOf = (item: Resolution['items'][number]) => {
+    const type = typeOf(item)
+    const css = item.value as string
+    const value = type === 'color' ? cssToColor(css) : cssToTokenValue(type, css)
+    return value === undefined ? undefined : show(type, value)
+  }
+  const added = resolution.items.filter((i) => i.kind === 'new')
+  // Only a one-to-one pair is a rename: one removed token and one new token share type and value. With two
+  // candidates on either side nobody can tell which is which, and both would inherit the same links.
   const renamedFrom = (type: TokenType, css: string) => {
     const match = removed.filter((t) => t.type === type && show(t.type, t.value) === css)
-    return match.length === 1 ? match[0] : undefined
+    const twins = added.filter((i) => typeOf(i) === type && cssOf(i) === css)
+    return match.length === 1 && twins.length === 1 ? match[0] : undefined
   }
   return resolution.items.map((item): TokenEdit => {
     if (item.kind === 'remove' && item.context !== undefined && item.context !== register.modes?.default)
@@ -161,11 +173,13 @@ function toEdits(
         'invalid_value',
         `${item.token}: "${css}" is not ${type === 'color' ? 'a colour' : `a ${type} value`}`,
       )
-    const aliasOf =
-      item.kind === 'change' && !item.context ? register.tokens.get(item.token)?.aliasOf : undefined
+    const own = item.context !== undefined && item.context !== register.modes?.default
+    const inContext = own ? tokensInContext(register, item.context) : register.tokens
+    const aliasOf = item.kind === 'change' ? inContext.get(item.token)?.aliasOf : undefined
     if (aliasOf !== undefined) {
-      // An alias gets no value of its own: it points at the one token that holds the new value.
-      const holders = [...register.tokens.values()].filter(
+      // An alias gets no value of its own, in any context: it points at the one token that holds the new
+      // value there. Writing the colour itself would cut the link for good.
+      const holders = [...inContext.values()].filter(
         (t) =>
           t.aliasOf === undefined &&
           t.type === type &&
@@ -177,7 +191,12 @@ function toEdits(
           'invalid_edit',
           `${item.token} points to ${aliasOf}; ${holders.length === 0 ? `no token in the register is ${css}` : `${holders.map((h) => h.path).join(', ')} are all ${css}`}. Change ${aliasOf}, or point ${item.token} at one token by hand.`,
         )
-      return { kind: 'retarget', path: item.token, to: (holders[0] as { path: string }).path }
+      return {
+        kind: 'retarget',
+        path: item.token,
+        to: (holders[0] as { path: string }).path,
+        ...(own ? { context: item.context } : {}),
+      }
     }
     return item.kind === 'change'
       ? { kind: 'set', path: item.token, value, ...(item.context ? { context: item.context } : {}) }
@@ -491,12 +510,24 @@ export async function writeApply(
     const own = (path: string) =>
       path.startsWith(`${registerRel}/proposals/`) || path.startsWith(`${registerRel}/generated/`)
     const inRepo = !registerRel.startsWith('..') && !isAbsolute(registerRel)
-    const dirty = (
-      inRepo ? await git(root, ['status', '--porcelain', '--untracked-files=all', '--', registerRel]) : ''
-    )
-      .split('\n')
-      .filter((line) => line.trim() && !own(line.slice(3)))
-    if (dirty.length > 0) throw new ApplyError('dirty', dirty.map((l) => l.slice(3)).join(', '))
+    // git names paths from the repository's top; the project may be a folder inside it (a monorepo).
+    // `-z` keeps names with spaces or umlauts unquoted.
+    const prefix = inRepo ? (await git(root, ['rev-parse', '--show-prefix'])).trim() : ''
+    const status = inRepo
+      ? await git(root, ['status', '--porcelain', '-z', '--untracked-files=all', '--', registerRel])
+      : ''
+    const dirty: string[] = []
+    const entries = status.split('\0')
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i] as string
+      if (entry.length < 4) continue
+      // A rename or copy is followed by its old name as a separate entry.
+      if (/[RC]/.test(entry.slice(0, 2))) i++
+      const path = entry.slice(3)
+      const rel = path.startsWith(prefix) ? path.slice(prefix.length) : path
+      if (!own(rel)) dirty.push(rel)
+    }
+    if (dirty.length > 0) throw new ApplyError('dirty', dirty.join(', '))
     await createBranch(root, branch)
   }
 

@@ -154,4 +154,53 @@ describe('apply on Figma proposals', () => {
     const color = JSON.parse(await readFile(join(root, '.accord/tokens/color.tokens.json'), 'utf8'))
     expect(color.color.brand.$value).toBe('{blue.700}')
   })
+  it('a dark value that only follows its target stays an alias', async () => {
+    const dark = join(root, '.accord/modes/theme/dark.tokens.json')
+    const before = await readFile(dark, 'utf8')
+    expect(before).toContain('{gray.50}')
+    await figma((vars) => {
+      const v = byName(vars, 'Gray/50')
+      for (const m of Object.keys(v.valuesByMode)) v.valuesByMode[m] = { r: 0.9, g: 0.95, b: 0.97, a: 1 }
+    })
+    const id = await propose()
+    const proposal = JSON.parse(await readFile(join(root, '.accord/proposals', `${id}.json`), 'utf8'))
+    expect(proposal.changes.map((c: { token: string }) => c.token)).toEqual(['gray.50'])
+    expect((await adopt(id)).code).toBe(0)
+    expect(await readFile(dark, 'utf8')).toBe(before)
+  })
+
+  it("two new tokens with a removed one's value are no rename: neither inherits its links", async () => {
+    await figma((vars) => {
+      const [id, v] = Object.entries(vars).find(([, x]) => x.name === 'Spacing/4') as [string, Variable]
+      delete vars[id]
+      vars[`${id}a`] = { ...structuredClone(v), name: 'Spacing/A' }
+      vars[`${id}b`] = { ...structuredClone(v), name: 'Spacing/B' }
+    })
+    expect((await adopt(await propose())).code).toBe(0)
+    const spacing = JSON.parse(
+      await readFile(join(root, '.accord/tokens/spacing.tokens.json'), 'utf8'),
+    ).spacing
+    expect(Object.keys(spacing).sort()).toEqual(['a', 'b'])
+    expect(spacing.a.$extensions?.['de.decivo.accord']?.ids?.css).toBeUndefined()
+    expect(spacing.b.$extensions?.['de.decivo.accord']?.ids?.css).toBeUndefined()
+  })
+
+  it('with --branch it works for a project in a subfolder of the repository', async () => {
+    const top = await mkdtemp(join(tmpdir(), 'accord-mono-'))
+    const sub = join(top, 'apps', 'web shop')
+    await cp(root, sub, { recursive: true, filter: (src) => !src.includes(`${root}/.git`) })
+    const g = (...args: string[]) =>
+      execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...args], { cwd: top })
+    g('init', '-q', '-b', 'main')
+    g('add', '-A')
+    g('commit', '-q', '-m', 'mono')
+    root = sub
+    await setRadius(16)
+    const result = await adopt(await propose(), true)
+    expect(result.out).not.toMatch(/uncommitted/i)
+    expect(result.code).toBe(0)
+    expect(execFileSync('git', ['branch', '--show-current'], { cwd: top, encoding: 'utf8' }).trim()).toMatch(
+      /^accord\/apply-/,
+    )
+  })
 })
