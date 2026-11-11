@@ -1,6 +1,6 @@
 {
   "name": "@decivo/accord-generators",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Generates DESIGN.md, AGENTS.md, the CLAUDE.md block, CSS and the changelog from a decivo Accord register.",
   "license": "MIT",
   "repository": {

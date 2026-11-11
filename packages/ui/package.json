@@ -1,6 +1,6 @@
 {
   "name": "@decivo/accord-ui",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "The decivo Accord web app on your machine: accord ui opens the register, proposals and decisions of a repository in the browser, with no account and no server.",
   "license": "MIT",
   "repository": {

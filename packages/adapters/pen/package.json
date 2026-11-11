@@ -1,6 +1,6 @@
 {
   "name": "@decivo/accord-adapter-pen",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Pencil (pen.dev) surface for decivo Accord: reads variables and themes from .pen files and compares them with the register.",
   "license": "MIT",
   "repository": {

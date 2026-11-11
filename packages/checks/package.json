@@ -1,6 +1,6 @@
 {
   "name": "@decivo/accord-checks",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Check layer for decivo Accord: deterministic rules, a provider interface for model checks, and routing of proposals.",
   "license": "MIT",
   "repository": {

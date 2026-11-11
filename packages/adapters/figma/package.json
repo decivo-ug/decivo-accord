@@ -1,6 +1,6 @@
 {
   "name": "@decivo/accord-adapter-figma",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Figma surface for decivo Accord: reads variables from .fig files and common exports and compares them with the register.",
   "license": "MIT",
   "repository": {

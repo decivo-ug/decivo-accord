@@ -1,6 +1,6 @@
 {
   "name": "@decivo/accord-mcp",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "MCP server for decivo Accord: tokens, component contracts, decisions with their reasons, and check_change for coding agents.",
   "license": "MIT",
   "repository": {
