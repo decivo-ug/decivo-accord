@@ -1,2 +1,3 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Text files are stored and checked out with LF on every system: fixtures are compared byte for byte,
+# and Accord writes LF itself.
+* text=auto eol=lf

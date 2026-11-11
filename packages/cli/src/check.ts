@@ -261,7 +261,9 @@ export async function checkChange(input: CheckInput): Promise<CheckResult> {
     ...new Set(
       [...(input.paths ?? []), ...(added ? [...added.keys()] : [])]
         .map((p) => relative(root, resolve(root, p)))
-        .filter((p) => p !== '' && !p.startsWith('..') && !isAbsolute(p)),
+        .filter((p) => p !== '' && !p.startsWith('..') && !isAbsolute(p))
+        // Accord names files with forward slashes everywhere (globs, reports), on Windows too.
+        .map((p) => p.split('\\').join('/')),
     ),
   ]
 

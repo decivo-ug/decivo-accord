@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { openBrowser, startUi, UiError } from './index.js'
+import { openBrowser, startUi, UiError, watchParent } from './index.js'
 
 /** `accord-ui [folder …] [--port <n>] [--no-open]`; `accord ui` in the CLI starts the same. */
 const args = process.argv.slice(2)
@@ -32,6 +32,9 @@ const stopAll = () => {
   abort.abort()
 }
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(signal, stopAll)
+// Started by `accord ui`: stop with it, also when it was killed hard and could pass no signal on.
+const parent = Number(process.env.ACCORD_UI_PARENT_PID)
+if (Number.isInteger(parent) && parent > 1) watchParent(parent, stopAll)
 
 try {
   const ui = await startUi({ roots, port, open, signal: abort.signal })

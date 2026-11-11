@@ -1,10 +1,10 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { choosePort, projectsFor, serverEnv, slugOf } from './index.js'
+import { choosePort, projectsFor, serverEnv, slugOf, watchParent } from './index.js'
 
 describe('accord ui', () => {
   it('makes URL-safe, unique project slugs', () => {
@@ -77,5 +77,18 @@ describe('accord ui', () => {
     expect(env.NEXT_PRIVATE_DEBUG).toBeUndefined()
     expect(env.__NEXT_X).toBeUndefined()
     expect(JSON.parse(env.ACCORD_PROJECTS ?? '[]')).toHaveLength(1)
+  })
+
+  it('notices when the process that started it is gone', async () => {
+    const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore' })
+    const gone = new Promise<void>((done) => watchParent(child.pid as number, done, 50))
+    let early = false
+    void gone.then(() => {
+      early = true
+    })
+    await new Promise((r) => setTimeout(r, 200))
+    expect(early).toBe(false)
+    child.kill('SIGKILL')
+    await gone
   })
 })

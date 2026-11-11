@@ -12,7 +12,9 @@ export async function git(cwd: string, args: string[]): Promise<string> {
   } catch (error) {
     const e = error as { code?: string | number; stderr?: string; message?: string }
     if (e.code === 'ENOENT') throw new AccordError('error.gitMissing')
-    const reason = (e.stderr || e.message || '').trim().split('\n').find(Boolean) ?? ''
+    // git may print warnings first (line endings on Windows); the reason is the first line that is none.
+    const lines = (e.stderr || e.message || '').trim().split('\n').filter(Boolean)
+    const reason = lines.find((l) => !/^(warning|hint):/i.test(l)) ?? lines[0] ?? ''
     throw new AccordError('error.git', {
       command: `git ${args[0]}`,
       message: reason.replace(/^fatal:\s*/, ''),

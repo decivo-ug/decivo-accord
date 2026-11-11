@@ -90,7 +90,7 @@ describe('accord init and diff with a shadcn .dark block', () => {
     ).toBe(0)
     const text = out.join('\n')
     expect(text).toContain('Modes: light, dark from code (.dark, detected)')
-    expect(text).toMatch(/10 value\(s\) for dark in .*\.accord\/modes\/theme\/dark\.tokens\.json/)
+    expect(text).toMatch(/10 value\(s\) for dark in .*\.accord[\\/]modes[\\/]theme[\\/]dark\.tokens\.json/)
 
     const register = await loadValidRegister(join(root, '.accord'))
     expect(register.modes?.contexts).toEqual(['light', 'dark'])

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { PGlite } from '@electric-sql/pglite'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/pglite'
@@ -10,7 +11,7 @@ describe('database schema', () => {
   const db = drizzle(client)
 
   beforeAll(async () => {
-    await migrate(db, { migrationsFolder: new URL('../../drizzle', import.meta.url).pathname })
+    await migrate(db, { migrationsFolder: fileURLToPath(new URL('../../drizzle', import.meta.url)) })
   })
 
   it('stores a proposal with its evaluation', async () => {

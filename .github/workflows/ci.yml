@@ -24,3 +24,19 @@ jobs:
       - run: node packages/cli/dist/bin.js --root apps/web export --check
       - run: node ../../packages/cli/dist/bin.js check $(git ls-files 'src/*.ts' 'src/*.tsx' 'src/*.css')
         working-directory: apps/web
+
+  # Accord runs on Windows too (paths, npx, starting the web app): build and tests there.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+      # The web app really starts here: one-time address, session, and it stops with its launcher.
+      - run: node scripts/ui-smoke.mjs

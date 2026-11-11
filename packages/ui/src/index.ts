@@ -192,6 +192,26 @@ async function waitUntilUp(
   throw new UiError(`the app did not start within ${Math.round(timeout / 1000)} s:\n${log()}`)
 }
 
+/**
+ * Calls `gone` once the process `pid` no longer exists. `accord ui` passes its own pid: between it and this
+ * launcher there may be npx, so no pipe or IPC channel links the two, and a hard kill of the CLI would
+ * otherwise leave the app running.
+ */
+export function watchParent(pid: number, gone: () => void, everyMs = 2000): () => void {
+  const timer = setInterval(() => {
+    try {
+      process.kill(pid, 0)
+    } catch (error) {
+      // EPERM: the process exists but belongs to someone else. Everything else: it is gone.
+      if ((error as NodeJS.ErrnoException).code === 'EPERM') return
+      clearInterval(timer)
+      gone()
+    }
+  }, everyMs)
+  timer.unref()
+  return () => clearInterval(timer)
+}
+
 const secret = () => randomBytes(32).toString('base64url')
 
 /** Start the web app for the given repositories on 127.0.0.1 and return its address with a one-time code. */

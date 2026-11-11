@@ -74,7 +74,8 @@ const configPath = (project: Project) => join(registerDirOf(project), CONFIG_FIL
 
 const shown = (root: string, path: string) => {
   const rel = relative(root, path)
-  return rel.startsWith('..') || isAbsolute(rel) ? path : rel || '.'
+  // Inside the project, paths read like in the config and in git: forward slashes, on Windows too.
+  return rel.startsWith('..') || isAbsolute(rel) ? path : rel.split('\\').join('/') || '.'
 }
 
 const unique = <T>(list: readonly T[]) => [...new Set(list)]
