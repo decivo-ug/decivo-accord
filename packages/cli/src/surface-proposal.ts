@@ -132,7 +132,10 @@ export async function proposeFromSurface(input: {
     const target = tokens.get(op.path.slice(7))?.aliasOf
     if (target === undefined) return false
     const targetKey = keyOf({ ...op, path: `tokens.${target}` })
-    return after.get(targetKey) === after.get(keyOf(op))
+    // In a context the target may have changed in the default context only (it has no own value there):
+    // the alias follows that change just the same.
+    const targetAfter = after.get(targetKey) ?? after.get(`tokens.${target}`)
+    return targetAfter !== undefined && targetAfter === after.get(keyOf(op))
   }
   const all = [...items.filter((i) => !follows(i)), ...added.map((a) => a.item)]
   if (all.length === 0) return undefined
